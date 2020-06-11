@@ -36,13 +36,24 @@ class Event:
             content = bs(html, "lxml")
             tracking_events = content.find_all("occurrence")
             events = []
+            
+            current_date = dateparser.parse(str(datetime.date.today()))
 
-            if (eta := content.find("expected-delivery-date")) is not None and content.find("changed-expected-date") is None:
-                package_eta = dateparser.parse(eta.text).strftime(r"%A, %B %d")
-            elif content.find("expected-delivery-date") is not None and (eta := content.find("changed-expected-date")) is not None:
-                package_eta = dateparser.parse(eta.text).strftime(r"%A, %B %d")
+            if (eta := content.find("expected-delivery-date").text) != "" and content.find("changed-expected-date").text == "":
+                unparsed_eta = dateparser.parse(eta)
+                if current_date > unparsed_eta:
+                    package_eta = "Date Pending"
+                else:
+                    package_eta = unparsed_eta.strftime(r"%A, %B %d")
+            elif content.find("expected-delivery-date").text != "" and (eta := content.find("changed-expected-date").text) != "":
+                unparsed_eta = dateparser.parse(eta)
+                package_eta = unparsed_eta.strftime(r"%A, %B %d")
             else:
-                package_eta = "Date Pending"
+                package_eta = "Unknown"
+
+            # To check if the delivery date is pending, ensure that expected-delivery-date is populated while changed-expected-date is not,
+            # then see if the expected-delivery-date is earlier than the current date. This is rough, but there isn't a way to tell from the API whether a package is
+            # pending or not.
 
             for event in tracking_events:
                 event_date = dateparser.parse(event.find("event-date").text).strftime(r"%A, %B %d")
